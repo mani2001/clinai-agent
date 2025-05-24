@@ -1,7 +1,7 @@
 let mediaRecorder;
 let audioChunks = [];
 let isPaused = false;
-let fullTranscript = "";
+let liveTranscript = "";
 
 const startBtn = document.getElementById('startRecording');
 const stopBtn = document.getElementById('stopRecording');
@@ -9,24 +9,43 @@ const finalStopBtn = document.getElementById('finalStopBtn');
 const notesInput = document.getElementById('notesInput');
 const conversationText = document.getElementById('conversationText');
 const editedNotes = document.getElementById('editedNotes');
-const modal = new bootstrap.Modal(document.getElementById('labeledModal'));
 const transcriptionOutput = document.getElementById('transcriptionOutput');
+const modal = new bootstrap.Modal(document.getElementById('labeledModal'));
 
 startBtn?.addEventListener('click', async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaRecorder = new MediaRecorder(stream);
     audioChunks = [];
+    liveTranscript = "";
+    transcriptionOutput.innerText = "Waiting for transcription...";
 
-    mediaRecorder.ondataavailable = event => {
-      if (event.data.size > 0) audioChunks.push(event.data);
+    mediaRecorder.ondataavailable = async (event) => {
+      if (event.data.size > 0) {
+        audioChunks.push(event.data);
+
+        const audioBlob = new Blob([event.data], { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'chunk.webm');
+
+        try {
+          const response = await fetch('/transcribe', {
+            method: 'POST',
+            body: formData
+          });
+
+          const { transcription } = await response.json();
+          if (transcription) {
+            liveTranscript += transcription + " ";
+            transcriptionOutput.innerText = liveTranscript.trim();
+          }
+        } catch (err) {
+          console.error("[ClinAI] ❌ Transcription error:", err);
+        }
+      }
     };
 
     mediaRecorder.onstop = async () => {
-      if (audioChunks.length === 0) {
-        alert("No audio recorded.");
-        return;
-      }
       const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
       const formData = new FormData();
       formData.append('file', audioBlob, 'recording.webm');
@@ -39,21 +58,19 @@ startBtn?.addEventListener('click', async () => {
       const { transcription } = await transcriptionRes.json();
       if (!transcription) return alert('Transcription failed.');
 
-      fullTranscript += (fullTranscript ? "\n" : "") + transcription;
-
       const labelRes = await fetch('/label_conversation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation: fullTranscript })
+        body: JSON.stringify({ conversation: transcription, previous: conversationText.value })
       });
 
       const labeled = await labelRes.json();
-      conversationText.value = labeled.labeled_conversation || fullTranscript;
+      conversationText.value = labeled.labeled_conversation || transcription;
       editedNotes.value = notesInput.value;
       modal.show();
     };
 
-    mediaRecorder.start();
+    mediaRecorder.start(2000);
     isPaused = false;
     stopBtn.innerText = 'Pause Recording';
     startBtn.disabled = true;
@@ -66,8 +83,8 @@ startBtn?.addEventListener('click', async () => {
     const bars = indicator.querySelectorAll('.bar');
     bars.forEach(bar => bar.style.animationPlayState = 'running');
 
-    transcriptionOutput.innerText = "Pause recording to see transcript";
     document.getElementById('transcriptionContainer').style.display = 'block';
+    transcriptionOutput.innerText = "";
     console.log("[ClinAI] 🎬 Recording started");
   } catch (err) {
     alert('Microphone access denied or unavailable.');
@@ -75,11 +92,9 @@ startBtn?.addEventListener('click', async () => {
   }
 });
 
-stopBtn?.addEventListener('click', async () => {
+stopBtn?.addEventListener('click', () => {
   const indicator = document.getElementById('recordingIndicator');
   if (mediaRecorder) {
-    mediaRecorder.requestData();
-
     if (!isPaused && mediaRecorder.state === 'recording') {
       mediaRecorder.pause();
       stopBtn.innerText = 'Resume Recording';
@@ -88,23 +103,6 @@ stopBtn?.addEventListener('click', async () => {
       const bars = indicator.querySelectorAll('.bar');
       bars.forEach(bar => bar.style.animationPlayState = 'paused');
       console.log("[ClinAI] ⏸ Recording paused");
-
-      // Show live transcription
-      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-      const formData = new FormData();
-      formData.append('file', audioBlob, 'recording.webm');
-
-      const transcriptionRes = await fetch('/transcribe', {
-        method: 'POST',
-        body: formData
-      });
-      const { transcription } = await transcriptionRes.json();
-
-      if (transcription) {
-        transcriptionOutput.innerText = transcription;
-        fullTranscript += (fullTranscript ? "\n" : "") + transcription;
-      }
-
     } else if (isPaused && mediaRecorder.state === 'paused') {
       mediaRecorder.resume();
       stopBtn.innerText = 'Pause Recording';

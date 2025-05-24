@@ -16,6 +16,7 @@ from pydantic_settings import BaseSettings
 import google.generativeai as genai
 import requests
 import io
+import uuid
 
 from mcp_client import MCPClient
 
@@ -100,6 +101,7 @@ async def serve_create():
 async def serve_patients_page():
     return FileResponse(frontend_dir / "patients.html")
 
+# ────────────────────────────────────────────────────────────────
 @app.post("/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
     try:

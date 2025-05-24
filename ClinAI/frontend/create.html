@@ -13,15 +13,8 @@
       border-right: 1px solid #dee2e6;
       padding: 2rem 1.5rem;
     }
-    .sidebar h5 {
-      margin-bottom: 1.5rem;
-    }
-    .sidebar .form-control,
     .sidebar .btn {
       margin-bottom: 1.25rem;
-    }
-    .sidebar hr {
-      margin: 1.5rem 0;
     }
     .voice-card {
       background-color: #ffffff;
@@ -31,19 +24,9 @@
       box-shadow: 0 0.1rem 0.75rem rgba(0, 0, 0, 0.05);
       margin-top: 2rem;
     }
-    .voice-card h5 {
-      font-weight: 700;
-      color: #4e73df;
-      margin-bottom: 0.75rem;
-    }
-    .voice-card p {
-      font-size: 0.95rem;
-      color: #6c757d;
-    }
     .voice-card .btn {
       min-width: 160px;
     }
-
     .mic-wave .bar {
       width: 6px;
       height: 20px;
@@ -51,19 +34,15 @@
       animation: bounce 1.2s infinite ease-in-out;
       border-radius: 3px;
     }
-    .mic-wave .bar1 { animation-delay: -1.1s; }
-    .mic-wave .bar2 { animation-delay: -1s; }
-    .mic-wave .bar3 { animation-delay: -0.9s; }
-    .mic-wave .bar4 { animation-delay: -0.8s; }
-    .mic-wave .bar5 { animation-delay: -0.7s; }
+    .bar1 { animation-delay: -1.1s; }
+    .bar2 { animation-delay: -1s; }
+    .bar3 { animation-delay: -0.9s; }
+    .bar4 { animation-delay: -0.8s; }
+    .bar5 { animation-delay: -0.7s; }
 
     @keyframes bounce {
-      0%, 40%, 100% {
-        transform: scaleY(0.3);
-      }
-      20% {
-        transform: scaleY(1);
-      }
+      0%, 40%, 100% { transform: scaleY(0.3); }
+      20% { transform: scaleY(1); }
     }
   </style>
 </head>
@@ -78,18 +57,12 @@
     <!-- Sidebar -->
     <div class="sidebar">
       <h5><i class="bi bi-search me-2"></i>Patient Search</h5>
-      <div class="dropdown">
-        <input type="text" id="patientSearchInput" class="form-control dropdown-toggle" data-bs-toggle="dropdown" placeholder="Enter Patient ID" autocomplete="off" />
-        <ul class="dropdown-menu w-100" id="recentSearchDropdown">
-          <li><span class="dropdown-item disabled">Recent Searches</span></li>
-        </ul>
-      </div>
-      <button class="btn btn-primary w-100" id="searchBtn">Search</button>
+      <input type="text" class="form-control mb-2" placeholder="Enter Patient ID">
+      <button class="btn btn-primary w-100">Search</button>
       <hr />
-      <button class="btn btn-success w-100" id="createNewBtn"><i class="bi bi-plus-circle me-1"></i> Create New Record</button>
-      <button class="btn btn-danger w-100" id="deleteBtn"><i class="bi bi-trash3-fill me-1"></i> Delete Record</button>
+      <button class="btn btn-success w-100">Create New Record</button>
+      <button class="btn btn-danger w-100">Delete Record</button>
       <hr />
-      <!-- Back/Forward via browser history -->
       <div class="d-flex justify-content-between">
         <button class="btn btn-outline-secondary btn-sm" onclick="history.back()"><i class="bi bi-arrow-left me-1"></i> Back</button>
         <button class="btn btn-outline-secondary btn-sm" onclick="history.forward()">Forward <i class="bi bi-arrow-right ms-1"></i></button>
@@ -98,15 +71,12 @@
 
     <!-- Main Content -->
     <div class="flex-grow-1 p-4 overflow-auto">
-      <!-- Notes Section -->
       <h4 class="mb-3 text-primary"><i class="bi bi-journal-medical me-2"></i>Notes</h4>
-      <textarea id="notesInput" placeholder="Write additional notes to record with the conversation"
-        style="width: 100%; height: 50vh; resize: vertical; padding: 1rem; background-color: #fafafa; border: 1px solid #ccc; border-radius: 0.5rem; font-size: 1rem;"></textarea>
+      <textarea id="notesInput" class="form-control mb-4" style="height: 150px;"></textarea>
 
-      <!-- Voice Conversation Section -->
       <div class="voice-card">
         <h5><i class="bi bi-mic-fill me-2"></i>Record Doctor-Patient Conversation</h5>
-        <p>This feature allows you to record a real-time conversation between a doctor and a patient and display the live transcription below.</p>
+        <p>This feature allows you to record a real-time conversation between a doctor and a patient.</p>
         <div class="d-flex justify-content-center gap-3 mt-3">
           <button id="startRecording" class="btn btn-outline-primary"><i class="bi bi-play-circle me-1"></i> Start Recording</button>
           <button id="stopRecording" class="btn btn-outline-warning"><i class="bi bi-pause-circle me-1"></i> Pause Recording</button>
@@ -128,12 +98,36 @@
         <!-- Transcription Output -->
         <div id="transcriptionContainer" class="mt-4" style="display: none;">
           <h6 class="text-primary"><i class="bi bi-chat-dots me-2"></i>Live Transcription</h6>
-          <div id="transcriptionOutput" class="p-3 border rounded bg-light" style="min-height: 80px; white-space: pre-wrap;"></div>
+          <div id="transcriptionOutput" class="p-3 border rounded bg-light" style="min-height: 80px; white-space: pre-wrap;">Pause recording to see transcript.</div>
         </div>
       </div>
     </div>
   </div>
 
+  <!-- Modal for Review -->
+  <div class="modal fade" id="labeledModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Review and Edit Transcription</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label">Conversation:</label>
+          <textarea id="conversationText" class="form-control mb-3" rows="6"></textarea>
+          <label class="form-label">Notes:</label>
+          <textarea id="editedNotes" class="form-control" rows="4"></textarea>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" id="continueRecording">Continue Recording</button>
+          <button class="btn btn-success" id="saveRecord">Save Record</button>
+          <button class="btn btn-outline-danger" data-bs-dismiss="modal">Discard</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
   <script src="/static/js/create.js"></script>
 </body>
 </html>
