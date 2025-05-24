@@ -3,77 +3,121 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>ClinAI - Clinical AI Assistant</title>
+  <title>ClinAI - Your Clinical Assistant</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"/>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css"/>
-  <link rel="stylesheet" href="/static/css/styles.css"/>
-  <link rel="icon" href="/static/assets/favicon.ico" />
+  <style>
+    :root {
+      --primary: #4e73df;
+      --light: #f8f9fc;
+      --muted: #6c757d;
+      --card-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+    }
+
+    body {
+      background-color: var(--light);
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .hero {
+      text-align: center;
+      padding: 4rem 1rem 2rem;
+      background: linear-gradient(120deg, #4e73df, #2c3e50);
+      color: white;
+    }
+
+    .hero h1 {
+      font-size: 3rem;
+      font-weight: 800;
+    }
+
+    .hero p {
+      font-size: 1.1rem;
+      max-width: 600px;
+      margin: 1rem auto 0;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 2rem;
+      padding: 3rem 2rem;
+      max-width: 1000px;
+      margin: auto;
+    }
+
+    .feature-card {
+      background-color: white;
+      border-radius: 1rem;
+      box-shadow: var(--card-shadow);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+    }
+
+    .feature-card h5 {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    .feature-card p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .card-blue {
+      border-top: 6px solid #4e73df;
+      background-color: #e8f0fe;
+    }
+
+    .card-green {
+      border-top: 6px solid #1cc88a;
+      background-color: #e6f9f2;
+    }
+
+    .card-orange {
+      border-top: 6px solid #f6c23e;
+      background-color: #fff9e6;
+    }
+
+    .card-purple {
+      border-top: 6px solid #6f42c1;
+      background-color: #f2efff;
+    }
+  </style>
 </head>
 <body>
-  <nav class="navbar navbar-expand-lg navbar-dark">
-    <div class="container">
-      <a class="navbar-brand" href="#"><i class="bi bi-heart-pulse-fill me-2"></i>ClinAI</a>
-    </div>
-  </nav>
+  <div class="hero">
+    <h1>ClinAI</h1>
+    <p>Your Clinical AI Assistant for managing patient records, so you can focus on what truly matters — patient care.</p>
+  </div>
 
-  <main class="container mt-4">
-    <div class="search-container">
-      <div class="row mb-3">
-        <div class="col">
-          <label for="patientSearch" class="form-label">Search Patient ID</label>
-          <div class="search-dropdown dropdown">
-            <div class="input-group">
-              <input type="text" id="patientSearch" class="form-control" placeholder="Enter Patient ID" aria-label="Patient ID" autocomplete="off" data-bs-toggle="dropdown" aria-expanded="false">
-              <button class="btn btn-primary" type="button" id="searchButton"><i class="bi bi-search"></i></button>
-            </div>
-            <ul class="dropdown-menu" id="patientSearchDropdown">
-              <li><span class="recent-search-label">Recent Searches</span></li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div class="row mb-3">
-        <div class="col-md-6 offset-md-3">
-          <div class="agent-toggle">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="agentToggle" checked>
-              <label class="form-check-label" for="agentToggle">
-                <i class="bi bi-robot me-1"></i> Use Intelligent Agent
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
+  <div class="card-grid">
+    <div class="feature-card card-blue" onclick="window.location.href='/patients'">
+      <h5>Patient Database</h5>
+      <p>Access and manage all your patient records from one place.</p>
     </div>
 
-    <div id="loadingSpinner" class="text-center" style="display: none;">
-      <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
-      <p>Processing patient data...</p>
+    <div class="feature-card card-green" onclick="window.location.href='/create'">
+      <h5>Create New Patient</h5>
+      <p>Start a new record with patient conversation and notes.</p>
     </div>
 
-    <div class="content-container">
-      <div class="patient-id-display">Patient ID: <span id="displayPatientId">Select a patient</span></div>
-      <ul class="nav nav-tabs" id="patientTabs" role="tablist">
-        <li class="nav-item"><button class="nav-link active" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-controls="history" aria-selected="true"><i class="bi bi-clipboard2-pulse me-2"></i>History</button></li>
-        <li class="nav-item"><button class="nav-link" id="prescriptions-tab" data-bs-toggle="tab" data-bs-target="#prescriptions" type="button" role="tab" aria-controls="prescriptions" aria-selected="false"><i class="bi bi-capsule me-2"></i>Prescriptions</button></li>
-        <li class="nav-item"><button class="nav-link" id="meetings-tab" data-bs-toggle="tab" data-bs-target="#meetings" type="button" role="tab" aria-controls="meetings" aria-selected="false"><i class="bi bi-calendar-check me-2"></i>Meetings</button></li>
-      </ul>
-      <div class="tab-content pt-3" id="patientTabsContent">
-        <div class="tab-pane fade show active" id="history" role="tabpanel" aria-labelledby="history-tab">
-          <div id="historyContent" class="tab-pane-content"></div>
-        </div>
-        <div class="tab-pane fade" id="prescriptions" role="tabpanel" aria-labelledby="prescriptions-tab">
-          <div id="prescriptionsContent" class="tab-pane-content"></div>
-        </div>
-        <div class="tab-pane fade" id="meetings" role="tabpanel" aria-labelledby="meetings-tab">
-          <div id="meetingsContent" class="tab-pane-content"></div>
-        </div>
-      </div>
+    <div class="feature-card card-orange" onclick="alert('Update Patient Record not yet implemented')">
+      <h5>Update Patient Record</h5>
+      <p>Edit and enrich existing records with up-to-date information.</p>
     </div>
-  </main>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="/static/js/main.js"></script>
+    <div class="feature-card card-purple" onclick="alert('Doctor Dashboard not yet implemented')">
+      <h5>Doctor’s Dashboard</h5>
+      <p>Summarized insights and recommendations for physicians.</p>
+    </div>
+  </div>
 </body>
 </html>
