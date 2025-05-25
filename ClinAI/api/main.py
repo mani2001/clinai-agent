@@ -166,10 +166,15 @@ The doctor always speaks first.
 @app.post("/save_record")
 async def save_record(request: Request):
     data = await request.json()
+    idx = data.get("idx", "Unknown")
     conversation = data.get("conversation", "")
     notes = data.get("notes", "")
 
-    content = f"--- Doctor-Patient Conversation ---\n{conversation}\n\n--- Doctor Notes ---\n{notes}"
+    content = (
+        f"--- Patient ID ---\n{idx}\n\n"
+        f"--- Doctor-Patient Conversation ---\n{conversation}\n\n"
+        f"--- Doctor Notes ---\n{notes}"
+    )
     return StreamingResponse(
         iter([content]),
         media_type="text/plain",

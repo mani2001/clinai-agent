@@ -1,7 +1,6 @@
 let mediaRecorder;
 let audioChunks = [];
 let isPaused = false;
-let liveTranscript = "";
 
 const startBtn = document.getElementById('startRecording');
 const stopBtn = document.getElementById('stopRecording');
@@ -9,40 +8,28 @@ const finalStopBtn = document.getElementById('finalStopBtn');
 const notesInput = document.getElementById('notesInput');
 const conversationText = document.getElementById('conversationText');
 const editedNotes = document.getElementById('editedNotes');
-const transcriptionOutput = document.getElementById('transcriptionOutput');
 const modal = new bootstrap.Modal(document.getElementById('labeledModal'));
+const patientIdInput = document.getElementById('patientIdInput');
+const modalPatientId = document.getElementById('modalPatientId');
+
+function generateRandomId() {
+  return Math.floor(Math.random() * 1e6).toString().padStart(6, '0');
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (patientIdInput) {
+    patientIdInput.value = generateRandomId();
+  }
+});
 
 startBtn?.addEventListener('click', async () => {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaRecorder = new MediaRecorder(stream);
     audioChunks = [];
-    liveTranscript = "";
-    transcriptionOutput.innerText = "Waiting for transcription...";
 
-    mediaRecorder.ondataavailable = async (event) => {
-      if (event.data.size > 0) {
-        audioChunks.push(event.data);
-
-        const audioBlob = new Blob([event.data], { type: 'audio/webm' });
-        const formData = new FormData();
-        formData.append('file', audioBlob, 'chunk.webm');
-
-        try {
-          const response = await fetch('/transcribe', {
-            method: 'POST',
-            body: formData
-          });
-
-          const { transcription } = await response.json();
-          if (transcription) {
-            liveTranscript += transcription + " ";
-            transcriptionOutput.innerText = liveTranscript.trim();
-          }
-        } catch (err) {
-          console.error("[ClinAI] ❌ Transcription error:", err);
-        }
-      }
+    mediaRecorder.ondataavailable = event => {
+      if (event.data.size > 0) audioChunks.push(event.data);
     };
 
     mediaRecorder.onstop = async () => {
@@ -61,16 +48,19 @@ startBtn?.addEventListener('click', async () => {
       const labelRes = await fetch('/label_conversation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation: transcription, previous: conversationText.value })
+        body: JSON.stringify({
+          conversation: transcription
+        })
       });
 
       const labeled = await labelRes.json();
       conversationText.value = labeled.labeled_conversation || transcription;
       editedNotes.value = notesInput.value;
+      modalPatientId.value = patientIdInput.value;
       modal.show();
     };
 
-    mediaRecorder.start(2000);
+    mediaRecorder.start();
     isPaused = false;
     stopBtn.innerText = 'Pause Recording';
     startBtn.disabled = true;
@@ -84,7 +74,6 @@ startBtn?.addEventListener('click', async () => {
     bars.forEach(bar => bar.style.animationPlayState = 'running');
 
     document.getElementById('transcriptionContainer').style.display = 'block';
-    transcriptionOutput.innerText = "";
     console.log("[ClinAI] 🎬 Recording started");
   } catch (err) {
     alert('Microphone access denied or unavailable.');
@@ -111,8 +100,6 @@ stopBtn?.addEventListener('click', () => {
       const bars = indicator.querySelectorAll('.bar');
       bars.forEach(bar => bar.style.animationPlayState = 'running');
       console.log("[ClinAI] ▶️ Recording resumed");
-    } else {
-      console.warn("[ClinAI] 🚫 MediaRecorder not in a recordable state");
     }
   }
 });
@@ -136,6 +123,7 @@ document.getElementById('continueRecording')?.addEventListener('click', () => {
 
 document.getElementById('saveRecord')?.addEventListener('click', async () => {
   const payload = {
+    idx: modalPatientId.value,
     conversation: conversationText.value,
     notes: editedNotes.value
   };
@@ -159,5 +147,25 @@ document.getElementById('saveRecord')?.addEventListener('click', async () => {
     modal.hide();
   } else {
     alert('Failed to save record.');
+  }
+});
+
+document.getElementById('manualCreateBtn')?.addEventListener('click', async () => {
+  const confirmed = confirm('Are you sure you want to create and pause the recording if active?');
+  if (!confirmed) return;
+
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop(); // will trigger onstop
+  } else {
+    const conversation = conversationText.value.trim();
+
+    if (!conversation) {
+      alert('No conversation found to label. Please record or write something first.');
+      return;
+    }
+
+    editedNotes.value = notesInput.value;
+    modalPatientId.value = patientIdInput.value;
+    modal.show();
   }
 });
