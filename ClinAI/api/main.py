@@ -165,18 +165,69 @@ The doctor always speaks first.
 
 @app.post("/save_record")
 async def save_record(request: Request):
-    data = await request.json()
-    idx = data.get("idx", "Unknown")
-    conversation = data.get("conversation", "")
-    notes = data.get("notes", "")
+    try:
+        data = await request.json()
+        idx = data.get("idx", "").strip()
+        conversation = data.get("conversation", "").strip()
+        notes = data.get("notes", "").strip()
 
-    content = (
-        f"--- Patient ID ---\n{idx}\n\n"
-        f"--- Doctor-Patient Conversation ---\n{conversation}\n\n"
-        f"--- Doctor Notes ---\n{notes}"
-    )
-    return StreamingResponse(
-        iter([content]),
-        media_type="text/plain",
-        headers={"Content-Disposition": "attachment; filename=patient_record.txt"}
-    )
+        # Validate inputs
+        if not idx:
+            raise HTTPException(status_code=400, detail="Patient ID is required")
+        if not (conversation or notes):
+            raise HTTPException(status_code=400, detail="Conversation or notes must be provided")
+
+        # Create payload with nested 'data' field as expected by MCP tools
+        payload = {"data": {"note": notes, "conversation": conversation}}
+        
+        # Call MCP tools and extract content from CallToolResult
+        summary_result = await app.state.client.call_tool("patient_summary", payload)
+        timeline_result = await app.state.client.call_tool("patient_timeline", payload)
+        keywords_result = await app.state.client.call_tool("patient_keywords", payload)
+        prescriptions_result = await app.state.client.call_tool("patient_prescriptions", payload)
+
+        # Extract content, handling potential errors
+        summary = summary_result.content[0].text if summary_result.content and not summary_result.isError else ""
+        timeline = timeline_result.content[0].text if timeline_result.content and not timeline_result.isError else []
+        keywords = keywords_result.content[0].text if keywords_result.content and not timeline_result.isError else []
+        prescriptions = prescriptions_result.content[0].text if prescriptions_result.content and not prescriptions_result.isError else []
+
+        # If any tool returned an error, log it for debugging
+        if summary_result.isError:
+            print(f"[MCP ERROR] patient_summary failed: {summary_result.content[0].text}")
+        if timeline_result.isError:
+            print(f"[MCP ERROR] patient_timeline failed: {timeline_result.content[0].text}")
+        if keywords_result.isError:
+            print(f"[MCP ERROR] patient_keywords failed: {keywords_result.content[0].text}")
+        if prescriptions_result.isError:
+            print(f"[MCP ERROR] patient_prescriptions failed: {prescriptions_result.content[0].text}")
+
+        # Create the record to store in MongoDB
+        record = {
+            "patient_id": idx,
+            "conversation": conversation,
+            "note": notes,
+            "summary": summary,
+            "timeline": timeline,
+            "keywords": keywords,
+            "prescriptions": prescriptions
+        }
+
+        # Save to MongoDB
+        result = await app.state.db[settings.mongodb_collection].update_one(
+            {"patient_id": idx},
+            {"$set": record},
+            upsert=True
+        )
+
+        # Log outcome for debugging
+        print(f"[MONGODB] Record saved for patient_id: {idx}, Modified: {result.modified_count}, Upserted: {result.upserted_id}")
+
+        # Return JSON response instead of file download
+        return JSONResponse(content={"message": f"Record saved successfully for patient {idx}"}, status_code=200)
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"[MCP/MONGODB ERROR] Failed to process or save record: {e}")
+        return JSONResponse(content={"error": f"Failed to save record: {str(e)}"}, status_code=500)
