@@ -11,6 +11,10 @@ const editedNotes = document.getElementById('editedNotes');
 const modal = new bootstrap.Modal(document.getElementById('labeledModal'));
 const patientIdInput = document.getElementById('patientIdInput');
 const modalPatientId = document.getElementById('modalPatientId');
+const createNewBtn = document.getElementById('createNewBtn');
+const backBtn = document.getElementById('backBtn');
+const discardConfirmModal = new bootstrap.Modal(document.getElementById('discardConfirmModal'));
+const confirmDiscardBtn = document.getElementById('confirmDiscardBtn');
 
 function generateRandomId() {
   return Math.floor(Math.random() * 1e6).toString().padStart(6, '0');
@@ -128,25 +132,22 @@ document.getElementById('saveRecord')?.addEventListener('click', async () => {
     notes: editedNotes.value
   };
 
-  const response = await fetch('/save_record', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
+  try {
+    const response = await fetch('/save_record', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
 
-  if (response.ok) {
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'patient_record.txt';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    window.URL.revokeObjectURL(url);
-    modal.hide();
-  } else {
-    alert('Failed to save record.');
+    const result = await response.json();
+    if (response.ok) {
+      alert(result.message || 'Record saved successfully!');
+      modal.hide();
+    } else {
+      alert(result.error || 'Failed to save record.');
+    }
+  } catch (error) {
+    alert('Error saving record: ' + error.message);
   }
 });
 
@@ -167,5 +168,40 @@ document.getElementById('manualCreateBtn')?.addEventListener('click', async () =
     editedNotes.value = notesInput.value;
     modalPatientId.value = patientIdInput.value;
     modal.show();
+  }
+});
+
+// Handle Create New Record button
+createNewBtn?.addEventListener('click', () => {
+  // Check if there's a draft (non-empty patient ID, notes, or conversation)
+  if (patientIdInput.value.trim() || notesInput.value.trim() || conversationText.value.trim()) {
+    discardConfirmModal.show();
+    confirmDiscardBtn.onclick = () => {
+      // Clear draft and generate new patient ID
+      patientIdInput.value = generateRandomId();
+      notesInput.value = '';
+      conversationText.value = '';
+      discardConfirmModal.hide();
+    };
+  } else {
+    // No draft, just generate new patient ID
+    patientIdInput.value = generateRandomId();
+    notesInput.value = '';
+    conversationText.value = '';
+  }
+});
+
+// Handle Back button
+backBtn?.addEventListener('click', () => {
+  // Check if there's a draft
+  if (patientIdInput.value.trim() || notesInput.value.trim() || conversationText.value.trim()) {
+    discardConfirmModal.show();
+    confirmDiscardBtn.onclick = () => {
+      discardConfirmModal.hide();
+      history.back();
+    };
+  } else {
+    // No draft, navigate back directly
+    history.back();
   }
 });

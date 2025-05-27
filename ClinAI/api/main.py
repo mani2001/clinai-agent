@@ -231,3 +231,32 @@ async def save_record(request: Request):
     except Exception as e:
         print(f"[MCP/MONGODB ERROR] Failed to process or save record: {e}")
         return JSONResponse(content={"error": f"Failed to save record: {str(e)}"}, status_code=500)
+
+@app.post("/delete_record")
+async def delete_record(request: Request):
+    try:
+        data = await request.json()
+        patient_id = data.get("patient_id", "").strip()
+
+        # Validate input
+        if not patient_id:
+            raise HTTPException(status_code=400, detail="Patient ID is required")
+
+        # Delete the record from MongoDB
+        result = await app.state.db[settings.mongodb_collection].delete_one(
+            {"patient_id": patient_id}
+        )
+
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail=f"No record found for patient ID {patient_id}")
+
+        # Log outcome for debugging
+        print(f"[MONGODB] Deleted record for patient_id: {patient_id}")
+
+        return JSONResponse(content={"message": f"Record for patient {patient_id} deleted successfully"}, status_code=200)
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"[MONGODB ERROR] Failed to delete record: {e}")
+        return JSONResponse(content={"error": f"Failed to delete record: {str(e)}"}, status_code=500)

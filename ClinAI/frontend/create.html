@@ -65,19 +65,17 @@
       <button class="btn btn-primary w-100" id="searchBtn">Search</button>
       <hr />
       <button class="btn btn-success w-100" id="createNewBtn"><i class="bi bi-plus-circle me-1"></i> Create New Record</button>
-      <button class="btn btn-danger w-100" id="deleteBtn"><i class="bi bi-trash3-fill me-1"></i> Delete Record</button>
       <hr />
       <div class="d-flex justify-content-between">
-        <button class="btn btn-outline-secondary btn-sm" onclick="history.back()"><i class="bi bi-arrow-left me-1"></i> Back</button>
+        <button class="btn btn-outline-secondary btn-sm" id="backBtn"><i class="bi bi-arrow-left me-1"></i> Back</button>
         <button class="btn btn-outline-secondary btn-sm" onclick="history.forward()">Forward <i class="bi bi-arrow-right ms-1"></i></button>
       </div>
     </div>
 
     <!-- Main Content -->
     <div class="flex-grow-1 p-4 overflow-auto">
-        <!-- Inside the Main Content section, ABOVE Notes Section -->
-    <h4 class="mb-3 text-primary"><i class="bi bi-person-badge me-2"></i>Patient ID</h4>
-    <input id="patientIdInput" class="form-control mb-4" placeholder="Auto-generated Patient ID" />
+      <h4 class="mb-3 text-primary"><i class="bi bi-person-badge me-2"></i>Patient ID</h4>
+      <input id="patientIdInput" class="form-control mb-4" placeholder="Auto-generated Patient ID" />
 
       <h4 class="mb-3 text-primary"><i class="bi bi-journal-medical me-2"></i>Notes</h4>
       <textarea id="notesInput" placeholder="Write additional notes to record with the conversation"
@@ -120,10 +118,8 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
-            <!-- Inside .modal-body BEFORE Conversation -->
-        <label class="form-label">Patient ID:</label>
-        <input id="modalPatientId" class="form-control mb-3" />
-
+          <label class="form-label">Patient ID:</label>
+          <input id="modalPatientId" class="form-control mb-3" />
           <label class="form-label">Conversation:</label>
           <textarea id="conversationText" class="form-control mb-3" rows="8"></textarea>
           <label class="form-label">Notes:</label>
@@ -133,6 +129,25 @@
           <button class="btn btn-secondary" id="continueRecording">Go Back</button>
           <button class="btn btn-success" id="saveRecord">Save Record</button>
           <button class="btn btn-outline-danger" data-bs-dismiss="modal">Discard</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for Discard Confirmation -->
+  <div class="modal fade" id="discardConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirm Discard</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to discard the draft and exit?</p>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+          <button class="btn btn-primary" id="confirmDiscardBtn">Yes</button>
         </div>
       </div>
     </div>
