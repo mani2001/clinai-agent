@@ -1,179 +1,159 @@
 from __future__ import annotations
 
-import json
 import os
-from typing import Any, Dict, List
+import traceback
+from typing import Any, Dict
 
 from dotenv import load_dotenv
 import google.generativeai as genai
 from mcp.server.fastmcp import FastMCP
 
-# ───────────────────────── initialise ─────────────────────────
+# ───── Initialise ─────
 load_dotenv()
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-
 _GEMINI_MODEL = "models/gemini-2.0-flash"
 mcp = FastMCP("clinai")
 
-# ───────────────────────── utility: safe JSON parse ─────────────────────────
-def _safe_json(raw: str, fallback: Any) -> Any:
+print(f"[INIT] Server starting with model: {_GEMINI_MODEL}")
+
+# ───── LLM Call Helper ─────
+def call_gemini_text(prompt: str, temperature: float = 0.0) -> str:
     try:
-        return json.loads(raw.strip())
+        model = genai.GenerativeModel(_GEMINI_MODEL)
+        resp = model.generate_content(
+            prompt,
+            generation_config=genai.GenerationConfig(
+                temperature=temperature,
+                max_output_tokens=1024
+            )
+        )
+        result = resp.text.strip()
+        return result
     except Exception as e:
-        print(f"JSON parse failed: {e}\nPayload was:\n{raw[:200]}\n")
-        return fallback
+        print(f"[GEMINI TEXT ERROR] {e}")
+        traceback.print_exc()
+        return ""
 
-# ───────────────────────── LLM wrapper ─────────────────────────
-def call_gemini_llm(
-    messages: List[Dict[str, str]],
-    model: str = _GEMINI_MODEL,
-    temperature: float = 0.0,
-) -> str:
-    chat = genai.GenerativeModel(model)
-    convo = chat.start_chat(history=messages[:-1])
-    resp = convo.send_message(
-        messages[-1]["content"],
-        generation_config=genai.GenerationConfig(temperature=temperature),
-    )
-    return resp.text.strip()
+# ───── Prompt Templates ─────
 
-def call_gemini_structured(
-    messages: List[Dict[str, str]],
-    response_schema: Dict,
-    model: str = _GEMINI_MODEL,
-    temperature: float = 0.0,
-) -> Any:
-    chat = genai.GenerativeModel(model)
-    convo = chat.start_chat(history=messages[:-1])
-    resp = convo.send_message(
-        messages[-1]["content"],
-        generation_config=genai.GenerationConfig(
-            temperature=temperature,
-            response_schema=response_schema,
-            response_mime_type="application/json"
-        ),
-    )
-    return json.loads(resp.text.strip())
-
-# ───────────────────────── prompt helpers ─────────────────────
 def summary_prompt(note: str, conv: str) -> str:
-    return f"""Write one paragraph (max 4 sentences) summarising the clinical situation, key events, and outcome.
-
-### NOTE
-{note}
-
-### CONVERSATION
-{conv}"""
+    return (
+        "Summarize the provided clinical note and conversation in one concise paragraph (no more than 4 sentences). "
+        "Include the overall clinical situation, main events, and outcome if stated. Only use the input provided.\n\n"
+        f"Clinical Note: {note}\n"
+        f"Conversation: {conv}"
+    )
 
 def timeline_prompt(note: str, conv: str) -> str:
-    return f"""Extract chronological events from this clinical case. List events in order with short phrasing and prepend date if known.
+    return (
+        "Extract all major clinical events from the note and conversation, in clear chronological order. "
+        "Return the result as a single Python-style string list, like ['event 1', 'event 2', ...]. "
+        "Do not return as JSON, a paragraph, or a bulleted list. "
+        "Only use the information provided.\n\n"
+        f"Clinical Note: {note}\n"
+        f"Conversation: {conv}"
+    )
 
-### NOTE
-{note}
-
-### CONVERSATION
-{conv}"""
-
-def drugs_prompt(note: str, conv: str) -> str:
-    return f"""Extract ALL medications mentioned in this clinical case. For each medication, identify:
-- The drug name
-- Route of administration (oral, IV, subcutaneous, etc.)
-- Dosage information
-- Current status (added by doctor, continued, discontinued, or mentioned)
-
-### NOTE
-{note}
-
-### CONVERSATION
-{conv}"""
+def prescriptions_prompt(note: str, conv: str) -> str:
+    return (
+        "Extract all prescription medications mentioned in the clinical note or conversation. "
+        "For each medication, return a line in the format: "
+        "'Drug: <drug name>, Dose: <dose>, Route: <route>, Status: <status>'. "
+        "Possible status values: 'active' (doctor prescribed), 'stopped' (doctor told to stop), 'continuing' (doctor said to continue or did not specify). "
+        "If a field is missing or not specified, use 'NA'. Return a plain list of lines, not JSON. "
+        "If no medications, return 'No prescriptions found.'\n\n"
+        f"Clinical Note: {note}\n"
+        f"Conversation: {conv}\n"
+    )
 
 def keywords_prompt(note: str, conv: str) -> str:
-    return f"""Extract up to 7 condition or disease keywords that best describe this clinical case.
+    return (
+        "Extract all main medical keywords, including primary problems, diseases, symptoms, medicines, and diagnostic tests "
+        "from the clinical note and conversation. Return the keywords as a plain, comma-separated list. "
+        "Do not return as JSON or a list object—just a readable comma-separated string. "
+        "If nothing found, return 'No main keywords found.'\n\n"
+        f"Clinical Note: {note}\n"
+        f"Conversation: {conv}\n"
+    )
 
-### NOTE
-{note}
+# ───── Extractor Functions ─────
 
-### CONVERSATION
-{conv}"""
-
-# ───────────────────────── response schemas ─────────────────────────
-PRESCRIPTION_SCHEMA = {
-    "type": "array",
-    "items": {
-        "type": "object",
-        "properties": {
-            "drug": {"type": "string"},
-            "route": {"type": "string"},
-            "dose": {"type": "string"},
-            "status": {
-                "type": "string",
-                "enum": ["added by doctor", "continued", "discontinued", "mentioned"]
-            }
-        },
-        "required": ["drug", "route", "dose", "status"]
-    }
-}
-
-TIMELINE_SCHEMA = {
-    "type": "array",
-    "items": {
-        "type": "string"
-    }
-}
-
-KEYWORDS_SCHEMA = {
-    "type": "array",
-    "items": {
-        "type": "string"
-    }
-}
-
-# ───────────────────────── LLM extractors ─────────────────────
 def get_summary(n: str, c: str) -> str:
-    return call_gemini_llm([{"role": "user", "content": summary_prompt(n, c)}])
-
-def get_timeline(n: str, c: str) -> List[str]:
     try:
-        return call_gemini_structured([{"role": "user", "content": timeline_prompt(n, c)}], TIMELINE_SCHEMA)
+        prompt = summary_prompt(n, c)
+        result = call_gemini_text(prompt)
+        return result.strip()
     except Exception as e:
-        print(f"Structured timeline extraction failed: {e}")
-        return []
+        print(f"[SUMMARY ERROR] Exception: {e}")
+        traceback.print_exc()
+        return ""
 
-def get_keywords(n: str, c: str) -> List[str]:
+def get_timeline(n: str, c: str) -> str:
     try:
-        return call_gemini_structured([{"role": "user", "content": keywords_prompt(n, c)}], KEYWORDS_SCHEMA)
+        prompt = timeline_prompt(n, c)
+        result = call_gemini_text(prompt)
+        return result.strip()
     except Exception as e:
-        print(f"Structured keywords extraction failed: {e}")
-        return []
+        print(f"[TIMELINE ERROR] Exception: {e}")
+        traceback.print_exc()
+        return "[]"
 
-def get_prescriptions(n: str, c: str) -> List[Dict[str, str]]:
+def get_keywords(n: str, c: str) -> str:
     try:
-        return call_gemini_structured([{"role": "user", "content": drugs_prompt(n, c)}], PRESCRIPTION_SCHEMA)
+        prompt = keywords_prompt(n, c)
+        result = call_gemini_text(prompt)
+        return result.strip()
     except Exception as e:
-        print(f"Structured prescription extraction failed: {e}")
-        return []
+        print(f"[KEYWORDS ERROR] Exception: {e}")
+        traceback.print_exc()
+        return "No main keywords found."
 
-# ───────────────────────── MCP tools ──────────────────────────
+def get_prescriptions(n: str, c: str) -> str:
+    try:
+        prompt = prescriptions_prompt(n, c)
+        result = call_gemini_text(prompt)
+        return result.strip()
+    except Exception as e:
+        print(f"[PRESCRIPTIONS ERROR] Exception: {e}")
+        traceback.print_exc()
+        return "No prescriptions found."
+
+# ───── MCP Tool Registration ─────
+
 @mcp.tool()
 def patient_summary(data: Dict[str, str]) -> str:
-    """One-paragraph clinical summary."""
-    return get_summary(data["note"], data["conversation"])
+    note = data.get("note", "")
+    conversation = data.get("conversation", "")
+    result = get_summary(note, conversation)
+    print(f"[TOOL] Summary result: {result}")
+    return result
 
 @mcp.tool()
-def patient_timeline(data: Dict[str, str]) -> List[str]:
-    """Chronological events as strings."""
-    return get_timeline(data["note"], data["conversation"])
+def patient_timeline(data: Dict[str, str]) -> str:
+    note = data.get("note", "")
+    conversation = data.get("conversation", "")
+    result = get_timeline(note, conversation)
+    print(f"[TOOL] Timeline result: {result}")
+    return result
 
 @mcp.tool()
-def patient_keywords(data: Dict[str, str]) -> List[str]:
-    """Disease/condition keywords."""
-    return get_keywords(data["note"], data["conversation"])
+def patient_keywords(data: Dict[str, str]) -> str:
+    note = data.get("note", "")
+    conversation = data.get("conversation", "")
+    result = get_keywords(note, conversation)
+    print(f"[TOOL] Keywords result: {result}")
+    return result
 
 @mcp.tool()
-def patient_prescriptions(data: Dict[str, str]) -> List[Dict[str, str]]:
-    """All medications with route, dose, status."""
-    return get_prescriptions(data["note"], data["conversation"])
+def patient_prescriptions(data: Dict[str, str]) -> str:
+    note = data.get("note", "")
+    conversation = data.get("conversation", "")
+    result = get_prescriptions(note, conversation)
+    print(f"[TOOL] Prescriptions result: {result}")
+    return result
 
-# ───────────────────────── run server ─────────────────────────
+# ───── Run MCP Server ─────
+
 if __name__ == "__main__":
+    print("[MAIN] Starting MCP server...")
     mcp.run(transport="stdio")

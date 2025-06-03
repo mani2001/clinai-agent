@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
@@ -17,8 +17,10 @@ import google.generativeai as genai
 import requests
 import io
 import uuid
+import json
 
 from mcp_client import MCPClient
+from mcp.types import CallToolResult, TextContent
 
 # ────────────────────────────────────────────────────────────────
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), ".env"))
@@ -67,18 +69,41 @@ async def get_patient_details(patient_id: str):
     if not (note or conversation):
         raise HTTPException(status_code=422, detail="No note or conversation available for patient")
 
-    payload = {"note": note, "conversation": conversation}
+    payload = {"data": {"note": note, "conversation": conversation}}
 
-    summary = await app.state.client.call_tool("patient_summary", payload)
-    timeline = await app.state.client.call_tool("patient_timeline", payload)
-    keywords = await app.state.client.call_tool("patient_keywords", payload)
-    drugs = await app.state.client.call_tool("patient_prescriptions", payload)
+    try:
+        summary_result = await app.state.client.call_tool("patient_summary", payload)
+        summary = summary_result.content[0].text if isinstance(summary_result, CallToolResult) and summary_result.content else ""
+    except Exception as e:
+        print(f"[MCP TOOL ERROR] patient_summary failed: {e}")
+        summary = ""
+
+    try:
+        timeline_result = await app.state.client.call_tool("patient_timeline", payload)
+        timeline = timeline_result.content[0].text if isinstance(timeline_result, CallToolResult) and timeline_result.content else ""
+    except Exception as e:
+        print(f"[MCP TOOL ERROR] patient_timeline failed: {e}")
+        timeline = ""
+
+    try:
+        keywords_result = await app.state.client.call_tool("patient_keywords", payload)
+        keywords = keywords_result.content[0].text if isinstance(keywords_result, CallToolResult) and keywords_result.content else ""
+    except Exception as e:
+        print(f"[MCP TOOL ERROR] patient_keywords failed: {e}")
+        keywords = ""
+
+    try:
+        prescriptions_result = await app.state.client.call_tool("patient_prescriptions", payload)
+        prescriptions = prescriptions_result.content[0].text if isinstance(prescriptions_result, CallToolResult) and prescriptions_result.content else ""
+    except Exception as e:
+        print(f"[MCP TOOL ERROR] patient_prescriptions failed: {e}")
+        prescriptions = ""
 
     bundle: Dict[str, Any] = {
         "summary": summary,
         "timeline": timeline,
         "keywords": keywords,
-        "prescriptions": drugs,
+        "prescriptions": prescriptions,
     }
 
     safe = jsonable_encoder(bundle)
@@ -100,6 +125,10 @@ async def serve_create():
 @app.get("/patients", include_in_schema=False)
 async def serve_patients_page():
     return FileResponse(frontend_dir / "patients.html")
+
+@app.get("/patient/{patient_id}", include_in_schema=False)
+async def serve_patient_page(patient_id: str):
+    return FileResponse(frontend_dir / "patient.html")
 
 # ────────────────────────────────────────────────────────────────
 @app.post("/transcribe")
@@ -127,14 +156,14 @@ async def transcribe_audio(file: UploadFile = File(...)):
             transcription = response.json().get("text", "")
             return JSONResponse(content={"transcription": transcription})
         else:
-            print("[GROQ ERROR]", response.status_code, response.text)
+            print(f"[GROQ ERROR] Status: {response.status_code}, Response: {response.text}")
             return JSONResponse(
                 content={"error": "Groq transcription failed", "details": response.text},
                 status_code=response.status_code
             )
 
     except Exception as e:
-        print("[SERVER ERROR]", str(e))
+        print(f"[SERVER ERROR] {str(e)}")
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 @app.post("/label_conversation")
@@ -160,7 +189,7 @@ The doctor always speaks first.
         labeled = response.text.strip()
         return JSONResponse(content={"labeled_conversation": labeled})
     except Exception as e:
-        print("[GEMINI ERROR]", str(e))
+        print(f"[GEMINI ERROR] {str(e)}")
         return JSONResponse(content={"error": str(e)}, status_code=500)
 
 @app.post("/save_record")
@@ -177,30 +206,48 @@ async def save_record(request: Request):
         if not (conversation or notes):
             raise HTTPException(status_code=400, detail="Conversation or notes must be provided")
 
-        # Create payload with nested 'data' field as expected by MCP tools
+        # Log inputs for debugging
+        print(f"[SAVE_RECORD INPUT] patient_id: {idx}\nnotes: {notes[:200]}\nconversation: {conversation[:200]}")
+        print(f"[SAVE_RECORD INPUT] Full notes length: {len(notes)}")
+        print(f"[SAVE_RECORD INPUT] Full conversation length: {len(conversation)}")
+
         payload = {"data": {"note": notes, "conversation": conversation}}
-        
-        # Call MCP tools and extract content from CallToolResult
-        summary_result = await app.state.client.call_tool("patient_summary", payload)
-        timeline_result = await app.state.client.call_tool("patient_timeline", payload)
-        keywords_result = await app.state.client.call_tool("patient_keywords", payload)
-        prescriptions_result = await app.state.client.call_tool("patient_prescriptions", payload)
 
-        # Extract content, handling potential errors
-        summary = summary_result.content[0].text if summary_result.content and not summary_result.isError else ""
-        timeline = timeline_result.content[0].text if timeline_result.content and not timeline_result.isError else []
-        keywords = keywords_result.content[0].text if keywords_result.content and not timeline_result.isError else []
-        prescriptions = prescriptions_result.content[0].text if prescriptions_result.content and not prescriptions_result.isError else []
+        # Timeline (paragraph)
+        try:
+            timeline_result = await app.state.client.call_tool("patient_timeline", payload)
+            timeline = timeline_result.content[0].text if isinstance(timeline_result, CallToolResult) and timeline_result.content else ""
+            print(f"[MCP TOOL OUTPUT] patient_timeline for patient_id: {idx}\n{timeline}")
+        except Exception as e:
+            print(f"[MCP TOOL ERROR] patient_timeline failed for patient_id: {idx}: {str(e)}")
+            timeline = ""
 
-        # If any tool returned an error, log it for debugging
-        if summary_result.isError:
-            print(f"[MCP ERROR] patient_summary failed: {summary_result.content[0].text}")
-        if timeline_result.isError:
-            print(f"[MCP ERROR] patient_timeline failed: {timeline_result.content[0].text}")
-        if keywords_result.isError:
-            print(f"[MCP ERROR] patient_keywords failed: {keywords_result.content[0].text}")
-        if prescriptions_result.isError:
-            print(f"[MCP ERROR] patient_prescriptions failed: {prescriptions_result.content[0].text}")
+        # Keywords (plain string)
+        try:
+            keywords_result = await app.state.client.call_tool("patient_keywords", payload)
+            keywords = keywords_result.content[0].text if isinstance(keywords_result, CallToolResult) and keywords_result.content else ""
+            print(f"[MCP TOOL OUTPUT] patient_keywords for patient_id: {idx}\n{keywords}")
+        except Exception as e:
+            print(f"[MCP TOOL ERROR] patient_keywords failed for patient_id: {idx}: {str(e)}")
+            keywords = ""
+
+        # Prescriptions (plain string)
+        try:
+            prescriptions_result = await app.state.client.call_tool("patient_prescriptions", payload)
+            prescriptions = prescriptions_result.content[0].text if isinstance(prescriptions_result, CallToolResult) and prescriptions_result.content else ""
+            print(f"[MCP TOOL OUTPUT] patient_prescriptions for patient_id: {idx}\n{prescriptions}")
+        except Exception as e:
+            print(f"[MCP TOOL ERROR] patient_prescriptions failed for patient_id: {idx}: {str(e)}")
+            prescriptions = ""
+
+        # Summary (paragraph)
+        try:
+            summary_result = await app.state.client.call_tool("patient_summary", payload)
+            summary = summary_result.content[0].text if isinstance(summary_result, CallToolResult) and summary_result.content else ""
+            print(f"[MCP TOOL OUTPUT] patient_summary for patient_id: {idx}\n{summary}")
+        except Exception as e:
+            print(f"[MCP TOOL ERROR] patient_summary failed for patient_id: {idx}: {str(e)}")
+            summary = ""
 
         # Create the record to store in MongoDB
         record = {
@@ -220,43 +267,61 @@ async def save_record(request: Request):
             upsert=True
         )
 
-        # Log outcome for debugging
         print(f"[MONGODB] Record saved for patient_id: {idx}, Modified: {result.modified_count}, Upserted: {result.upserted_id}")
 
-        # Return JSON response instead of file download
         return JSONResponse(content={"message": f"Record saved successfully for patient {idx}"}, status_code=200)
 
     except HTTPException as he:
         raise he
     except Exception as e:
-        print(f"[MCP/MONGODB ERROR] Failed to process or save record: {e}")
+        print(f"[MCP/MONGODB ERROR] Failed to process or save record: {str(e)}")
         return JSONResponse(content={"error": f"Failed to save record: {str(e)}"}, status_code=500)
 
-@app.post("/delete_record")
-async def delete_record(request: Request):
+@app.get("/api/patient/{patient_id}")
+async def get_patient_data(patient_id: str):
     try:
-        data = await request.json()
-        patient_id = data.get("patient_id", "").strip()
-
-        # Validate input
-        if not patient_id:
-            raise HTTPException(status_code=400, detail="Patient ID is required")
-
-        # Delete the record from MongoDB
-        result = await app.state.db[settings.mongodb_collection].delete_one(
-            {"patient_id": patient_id}
+        rec = await app.state.db[settings.mongodb_collection].find_one(
+            {"patient_id": str(patient_id)},
+            {"_id": 0, "note": 1, "summary": 1, "prescriptions": 1, "timeline": 1, "keywords": 1}
         )
+        if rec is None:
+            raise HTTPException(status_code=404, detail="Patient not found")
 
-        if result.deleted_count == 0:
-            raise HTTPException(status_code=404, detail=f"No record found for patient ID {patient_id}")
+        data = {
+            "note": rec.get("note", ""),
+            "summary": rec.get("summary", ""),
+            "prescriptions": rec.get("prescriptions", ""),
+            "timeline": rec.get("timeline", ""),
+            "keywords": rec.get("keywords", "")
+        }
 
-        # Log outcome for debugging
-        print(f"[MONGODB] Deleted record for patient_id: {patient_id}")
-
-        return JSONResponse(content={"message": f"Record for patient {patient_id} deleted successfully"}, status_code=200)
-
+        return JSONResponse(content=data)
     except HTTPException as he:
         raise he
     except Exception as e:
-        print(f"[MONGODB ERROR] Failed to delete record: {e}")
-        return JSONResponse(content={"error": f"Failed to delete record: {str(e)}"}, status_code=500)
+        print(f"[MONGODB ERROR] Failed to fetch patient data: {e}")
+        return JSONResponse(content={"error": f"Failed to fetch patient data: {str(e)}"}, status_code=500)
+
+@app.patch("/patient/{patient_id}/keywords")
+async def update_patient_keywords(patient_id: str, request: Request):
+    try:
+        data = await request.json()
+        keywords = data.get("keywords", "")
+        if not isinstance(keywords, str):
+            raise HTTPException(status_code=400, detail="Keywords must be a string")
+
+        result = await app.state.db[settings.mongodb_collection].update_one(
+            {"patient_id": str(patient_id)},
+            {"$set": {"keywords": keywords}}
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Patient not found")
+
+        print(f"[MONGODB] Updated keywords for patient_id: {patient_id}")
+        return JSONResponse(content={"message": f"Keywords updated successfully for patient {patient_id}"}, status_code=200)
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"[MONGODB ERROR] Failed to update keywords: {e}")
+        return JSONResponse(content={"error": f"Failed to update keywords: {str(e)}"}, status_code=500)
