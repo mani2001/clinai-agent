@@ -402,3 +402,14 @@ async def update_patient_keywords(patient_id: str, request: Request):
     except Exception as e:
         print(f"[MONGODB ERROR] Failed to update keywords: {e}")
         return JSONResponse(content={"error": f"Failed to update keywords: {str(e)}"}, status_code=500)
+@app.get("/update-patients", include_in_schema=False)
+async def serve_update_patients_page():
+    return FileResponse(frontend_dir / "updatepatients.html")
+
+@app.get("/update-patient/{patient_id}", include_in_schema=False)
+async def serve_update_patient_detail_page(patient_id: str):
+    return FileResponse(frontend_dir / "updatepatient.html")
+
+@app.get("/patients", include_in_schema=False)
+async def serve_patients_page():
+    return FileResponse(frontend_dir / "patients.html")

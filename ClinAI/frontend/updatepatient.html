@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Update Patient Record - ClinAI</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css"/>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css"/>
+  <style>
+    :root {
+      --primary: #f6c23e;
+      --light: #fff9e6;
+      --muted: #6c757d;
+      --card-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+    }
+    body {
+      background-color: var(--light);
+      font-family: 'Segoe UI', Tahoma, Geneva, sans-serif;
+    }
+    .navbar {
+      background-color: var(--primary);
+    }
+    .patient-header {
+      background: white;
+      border-radius: 1rem;
+      box-shadow: var(--card-shadow);
+      padding: 2rem;
+      margin: 2rem auto;
+      max-width: 1000px;
+      border-top: 4px solid var(--primary);
+    }
+    .patient-header h2 {
+      color: var(--primary);
+      font-weight: 700;
+    }
+    .patient-details p {
+      margin: 0.5rem 0;
+      font-size: 1.1rem;
+    }
+    .tab-content {
+      background: white;
+      border-radius: 1rem;
+      box-shadow: var(--card-shadow);
+      padding: 2rem;
+      margin: 2rem auto;
+      max-width: 1000px;
+      border-top: 4px solid var(--primary);
+    }
+    .nav-tabs .nav-link {
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .nav-tabs .nav-link.active {
+      color: var(--primary);
+      border-bottom: 3px solid var(--primary);
+    }
+    .table {
+      margin-top: 1rem;
+    }
+    .timeline {
+      display: flex;
+      overflow-x: auto;
+      padding: 1rem 0;
+      gap: 1rem;
+    }
+    .timeline-card {
+      flex: 0 0 auto;
+      width: 250px;
+      background: var(--light);
+      border: 1px solid #dee2e6;
+      border-radius: 0.5rem;
+      padding: 1rem;
+      box-shadow: var(--card-shadow);
+    }
+    .keywords-section {
+      max-width: 1000px;
+      margin: 2rem auto;
+      background: white;
+      border-radius: 1rem;
+      box-shadow: var(--card-shadow);
+      padding: 2rem;
+      border-top: 4px solid var(--primary);
+    }
+    .keywords-section h4 {
+      color: var(--primary);
+    }
+    .keywords-section textarea {
+      width: 100%;
+      min-height: 100px;
+      resize: vertical;
+      font-size: 1rem;
+      border: 2px solid var(--primary);
+    }
+    .keywords-section textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 0.2rem rgba(246, 194, 62, 0.25);
+    }
+    .btn-primary {
+      background-color: var(--primary);
+      border-color: var(--primary);
+      color: #333;
+    }
+    .btn-primary:hover {
+      background-color: #e0aa3e;
+      border-color: #e0aa3e;
+      color: #333;
+    }
+    .btn-outline-primary {
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+    .btn-outline-primary:hover {
+      background-color: var(--primary);
+      border-color: var(--primary);
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark">
+    <div class="container">
+      <a class="navbar-brand" href="/"><i class="bi bi-heart-pulse-fill me-2"></i>ClinAI</a>
+    </div>
+  </nav>
+
+  <div class="patient-header">
+    <h2>Update Patient Record</h2>
+    <div class="patient-details">
+      <p><strong>Name:</strong> <span id="patientName">N/A</span></p>
+      <p><strong>Age:</strong> <span id="patientAge">N/A</span></p>
+      <p><strong>Gender:</strong> <span id="patientGender">N/A</span></p>
+    </div>
+  </div>
+
+  <div class="tab-content">
+    <ul class="nav nav-tabs" id="patientTabs" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" type="button" role="tab">Summary</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="prescriptions-tab" data-bs-toggle="tab" data-bs-target="#prescriptions" type="button" role="tab">Prescriptions</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="timeline-tab" data-bs-toggle="tab" data-bs-target="#timeline" type="button" role="tab">Timeline</button>
+      </li>
+    </ul>
+    <div class="tab-content mt-3" id="patientTabsContent">
+      <div class="tab-pane fade show active" id="summary" role="tabpanel">
+        <p id="summaryContent">Loading...</p>
+      </div>
+      <div class="tab-pane fade" id="prescriptions" role="tabpanel">
+        <table class="table table-bordered">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Dosage</th>
+              <th>Mode</th>
+            </tr>
+          </thead>
+          <tbody id="prescriptionsTable">
+            <tr><td colspan="3">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tab-pane fade" id="timeline" role="tabpanel">
+        <div class="timeline" id="timelineContent">
+          <div>Loading...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="keywords-section">
+    <h4>Keywords</h4>
+    <textarea id="keywordsInput" class="form-control" placeholder="Enter keywords..."></textarea>
+    <button class="btn btn-primary mt-2" id="saveKeywordsBtn">Save Keywords</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/static/js/updatepatient.js"></script>
+</body>
+</html>
