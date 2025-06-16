@@ -98,25 +98,13 @@ function displayPatientData(data) {
     prescriptionsContent.innerHTML = '';
     meetingsContent.innerHTML = '';
 
-    // Timeline → History
-    if (data.timeline && data.timeline.length > 0) {
-        data.timeline.forEach(eventText => {
-            historyContent.appendChild(createTimelineItem(eventText));
-        });
-    } else {
-        historyContent.innerHTML = '<div class="empty-tab-message">No history available</div>';
-    }
+    // Timeline → History - REMOVED, just show empty
+    historyContent.innerHTML = '<div class="empty-tab-message">No history available</div>';
 
-    // Prescriptions
-    if (data.prescriptions && data.prescriptions.length > 0) {
-        data.prescriptions.forEach(item => {
-            prescriptionsContent.appendChild(createPrescriptionItem(item));
-        });
-    } else {
-        prescriptionsContent.innerHTML = '<div class="empty-tab-message">No prescriptions available</div>';
-    }
+    // Prescriptions - REMOVED, just show empty
+    prescriptionsContent.innerHTML = '<div class="empty-tab-message">No prescriptions available</div>';
 
-    // Keywords (used as stand-in for “meetings”)
+    // Keywords (used as stand-in for "meetings")
     if (data.keywords && data.keywords.length > 0) {
         data.keywords.forEach(keyword => {
             meetingsContent.appendChild(createKeywordItem(keyword));

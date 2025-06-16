@@ -76,6 +76,30 @@ def keywords_prompt(note: str, conv: str) -> str:
         f"Conversation: {conv}\n"
     )
 
+def name_prompt(note: str, conv: str) -> str:
+    return (
+        "Extract only the patient's name from the clinical note and conversation. "
+        "Return just the name, nothing else. If not found, return 'NA'.\n\n"
+        f"Clinical Note: {note}\n"
+        f"Conversation: {conv}\n"
+    )
+
+def age_prompt(note: str, conv: str) -> str:
+    return (
+        "Extract only the patient's age from the clinical note and conversation. "
+        "Return just the age number, nothing else. If not found, return 'NA'.\n\n"
+        f"Clinical Note: {note}\n"
+        f"Conversation: {conv}\n"
+    )
+
+def gender_prompt(note: str, conv: str) -> str:
+    return (
+        "Extract only the patient's gender from the clinical note and conversation. "
+        "Return just the gender (Male/Female/M/F), nothing else. If not found, return 'NA'.\n\n"
+        f"Clinical Note: {note}\n"
+        f"Conversation: {conv}\n"
+    )
+
 # ───── Extractor Functions ─────
 
 def get_summary(n: str, c: str) -> str:
@@ -118,6 +142,36 @@ def get_prescriptions(n: str, c: str) -> str:
         traceback.print_exc()
         return "No prescriptions found."
 
+def get_name(n: str, c: str) -> str:
+    try:
+        prompt = name_prompt(n, c)
+        result = call_gemini_text(prompt)
+        return result.strip()
+    except Exception as e:
+        print(f"[NAME ERROR] Exception: {e}")
+        traceback.print_exc()
+        return "NA"
+
+def get_age(n: str, c: str) -> str:
+    try:
+        prompt = age_prompt(n, c)
+        result = call_gemini_text(prompt)
+        return result.strip()
+    except Exception as e:
+        print(f"[AGE ERROR] Exception: {e}")
+        traceback.print_exc()
+        return "NA"
+
+def get_gender(n: str, c: str) -> str:
+    try:
+        prompt = gender_prompt(n, c)
+        result = call_gemini_text(prompt)
+        return result.strip()
+    except Exception as e:
+        print(f"[GENDER ERROR] Exception: {e}")
+        traceback.print_exc()
+        return "NA"
+
 # ───── MCP Tool Registration ─────
 
 @mcp.tool()
@@ -150,6 +204,30 @@ def patient_prescriptions(data: Dict[str, str]) -> str:
     conversation = data.get("conversation", "")
     result = get_prescriptions(note, conversation)
     print(f"[TOOL] Prescriptions result: {result}")
+    return result
+
+@mcp.tool()
+def patient_name(data: Dict[str, str]) -> str:
+    note = data.get("note", "")
+    conversation = data.get("conversation", "")
+    result = get_name(note, conversation)
+    print(f"[TOOL] Name result: {result}")
+    return result
+
+@mcp.tool()
+def patient_age(data: Dict[str, str]) -> str:
+    note = data.get("note", "")
+    conversation = data.get("conversation", "")
+    result = get_age(note, conversation)
+    print(f"[TOOL] Age result: {result}")
+    return result
+
+@mcp.tool()
+def patient_gender(data: Dict[str, str]) -> str:
+    note = data.get("note", "")
+    conversation = data.get("conversation", "")
+    result = get_gender(note, conversation)
+    print(f"[TOOL] Gender result: {result}")
     return result
 
 # ───── Run MCP Server ─────

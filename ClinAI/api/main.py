@@ -60,54 +60,27 @@ app.add_middleware(
 async def get_patient_details(patient_id: str):
     rec = await app.state.db[settings.mongodb_collection].find_one(
         {"patient_id": str(patient_id)},
-        {"_id": 0, "note": 1, "conversation": 1},
+        {"_id": 0, "summary": 1, "keywords": 1, "name": 1, "age": 1, "gender": 1},
     )
     if rec is None:
         raise HTTPException(status_code=404, detail="Patient not found")
 
-    note, conversation = rec.get("note", ""), rec.get("conversation", "")
-    if not (note or conversation):
-        raise HTTPException(status_code=422, detail="No note or conversation available for patient")
+    # Parse keywords if it's comma-separated
+    keywords_raw = rec.get("keywords", "")
+    keywords_parsed = []
+    if keywords_raw and keywords_raw != "No main keywords found.":
+        keywords_parsed = [k.strip() for k in keywords_raw.split(",")]
 
-    payload = {"data": {"note": note, "conversation": conversation}}
-
-    try:
-        summary_result = await app.state.client.call_tool("patient_summary", payload)
-        summary = summary_result.content[0].text if isinstance(summary_result, CallToolResult) and summary_result.content else ""
-    except Exception as e:
-        print(f"[MCP TOOL ERROR] patient_summary failed: {e}")
-        summary = ""
-
-    try:
-        timeline_result = await app.state.client.call_tool("patient_timeline", payload)
-        timeline = timeline_result.content[0].text if isinstance(timeline_result, CallToolResult) and timeline_result.content else ""
-    except Exception as e:
-        print(f"[MCP TOOL ERROR] patient_timeline failed: {e}")
-        timeline = ""
-
-    try:
-        keywords_result = await app.state.client.call_tool("patient_keywords", payload)
-        keywords = keywords_result.content[0].text if isinstance(keywords_result, CallToolResult) and keywords_result.content else ""
-    except Exception as e:
-        print(f"[MCP TOOL ERROR] patient_keywords failed: {e}")
-        keywords = ""
-
-    try:
-        prescriptions_result = await app.state.client.call_tool("patient_prescriptions", payload)
-        prescriptions = prescriptions_result.content[0].text if isinstance(prescriptions_result, CallToolResult) and prescriptions_result.content else ""
-    except Exception as e:
-        print(f"[MCP TOOL ERROR] patient_prescriptions failed: {e}")
-        prescriptions = ""
-
+    # Pass through the stored data, properly formatted
     bundle: Dict[str, Any] = {
-        "summary": summary,
-        "timeline": timeline,
-        "keywords": keywords,
-        "prescriptions": prescriptions,
+        "summary": rec.get("summary", ""),
+        "keywords": keywords_parsed,
+        "name": rec.get("name", "N/A"),
+        "age": rec.get("age", "N/A"), 
+        "gender": rec.get("gender", "N/A")
     }
 
-    safe = jsonable_encoder(bundle)
-    return JSONResponse(content=safe)
+    return JSONResponse(content=bundle)
 
 # ────────────────────────────────────────────────────────────────
 # Static frontend pages
@@ -249,6 +222,33 @@ async def save_record(request: Request):
             print(f"[MCP TOOL ERROR] patient_summary failed for patient_id: {idx}: {str(e)}")
             summary = ""
 
+        # Name
+        try:
+            name_result = await app.state.client.call_tool("patient_name", payload)
+            name = name_result.content[0].text if isinstance(name_result, CallToolResult) and name_result.content else "NA"
+            print(f"[MCP TOOL OUTPUT] patient_name for patient_id: {idx}\n{name}")
+        except Exception as e:
+            print(f"[MCP TOOL ERROR] patient_name failed for patient_id: {idx}: {str(e)}")
+            name = "NA"
+
+        # Age
+        try:
+            age_result = await app.state.client.call_tool("patient_age", payload)
+            age = age_result.content[0].text if isinstance(age_result, CallToolResult) and age_result.content else "NA"
+            print(f"[MCP TOOL OUTPUT] patient_age for patient_id: {idx}\n{age}")
+        except Exception as e:
+            print(f"[MCP TOOL ERROR] patient_age failed for patient_id: {idx}: {str(e)}")
+            age = "NA"
+
+        # Gender
+        try:
+            gender_result = await app.state.client.call_tool("patient_gender", payload)
+            gender = gender_result.content[0].text if isinstance(gender_result, CallToolResult) and gender_result.content else "NA"
+            print(f"[MCP TOOL OUTPUT] patient_gender for patient_id: {idx}\n{gender}")
+        except Exception as e:
+            print(f"[MCP TOOL ERROR] patient_gender failed for patient_id: {idx}: {str(e)}")
+            gender = "NA"
+
         # Create the record to store in MongoDB
         record = {
             "patient_id": idx,
@@ -257,7 +257,10 @@ async def save_record(request: Request):
             "summary": summary,
             "timeline": timeline,
             "keywords": keywords,
-            "prescriptions": prescriptions
+            "prescriptions": prescriptions,
+            "name": name,
+            "age": age,
+            "gender": gender
         }
 
         # Save to MongoDB
@@ -282,7 +285,7 @@ async def get_patient_data(patient_id: str):
     try:
         rec = await app.state.db[settings.mongodb_collection].find_one(
             {"patient_id": str(patient_id)},
-            {"_id": 0, "note": 1, "summary": 1, "prescriptions": 1, "timeline": 1, "keywords": 1}
+            {"_id": 0, "note": 1, "summary": 1, "prescriptions": 1, "timeline": 1, "keywords": 1, "name": 1, "age": 1, "gender": 1}
         )
         if rec is None:
             raise HTTPException(status_code=404, detail="Patient not found")
@@ -292,7 +295,10 @@ async def get_patient_data(patient_id: str):
             "summary": rec.get("summary", ""),
             "prescriptions": rec.get("prescriptions", ""),
             "timeline": rec.get("timeline", ""),
-            "keywords": rec.get("keywords", "")
+            "keywords": rec.get("keywords", ""),
+            "name": rec.get("name", "N/A"),
+            "age": rec.get("age", "N/A"),
+            "gender": rec.get("gender", "N/A")
         }
 
         return JSONResponse(content=data)
