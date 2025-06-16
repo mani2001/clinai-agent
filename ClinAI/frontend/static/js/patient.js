@@ -29,14 +29,115 @@ async function fetchPatientData() {
       prescriptionsTable.innerHTML = '<tr><td colspan="3">No prescriptions available.</td></tr>';
     }
 
-    // Timeline - handle as string since it's stored as text
+    // Timeline - parse the list string and create horizontal scrollable cards
     const timelineContent = document.getElementById('timelineContent');
     timelineContent.innerHTML = '';
+    
+    let timelineEvents = [];
     if (data.timeline && data.timeline !== "[]") {
-      const card = document.createElement('div');
-      card.className = 'timeline-card';
-      card.textContent = data.timeline;
-      timelineContent.appendChild(card);
+      try {
+        // Parse the string representation of the list
+        timelineEvents = JSON.parse(data.timeline.replace(/'/g, '"'));
+      } catch (e) {
+        // If parsing fails, treat as single event
+        timelineEvents = [data.timeline];
+      }
+    }
+
+    if (timelineEvents.length > 0) {
+      const cardsHtml = timelineEvents.map((event, index) => `
+        <div class="timeline-card-wrapper">
+          <div class="timeline-card-modern">
+            <div class="timeline-card-header">
+              <span class="timeline-badge">Event ${index + 1} of ${timelineEvents.length}</span>
+            </div>
+            <div class="timeline-card-content">
+              ${event}
+            </div>
+          </div>
+        </div>
+      `).join('');
+      
+      timelineContent.innerHTML = `
+        <div class="timeline-scroll-container">
+          ${cardsHtml}
+        </div>
+        <style>
+          .timeline-scroll-container {
+            display: flex;
+            overflow-x: auto;
+            overflow-y: hidden;
+            gap: 1rem;
+            padding: 1rem 0;
+            scroll-behavior: smooth;
+          }
+          
+          .timeline-scroll-container::-webkit-scrollbar {
+            height: 8px;
+          }
+          
+          .timeline-scroll-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+          }
+          
+          .timeline-scroll-container::-webkit-scrollbar-thumb {
+            background: #4e73df;
+            border-radius: 4px;
+          }
+          
+          .timeline-card-wrapper {
+            flex: 0 0 auto;
+            min-width: 300px;
+            max-width: 350px;
+          }
+          
+          .timeline-card-modern {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 0;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            height: 200px;
+            display: flex;
+            flex-direction: column;
+          }
+          
+          .timeline-card-modern:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+          }
+          
+          .timeline-card-header {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 12px 16px;
+            backdrop-filter: blur(10px);
+          }
+          
+          .timeline-badge {
+            background: rgba(255, 255, 255, 0.9);
+            color: #4e73df;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          
+          .timeline-card-content {
+            padding: 16px;
+            color: white;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+          }
+        </style>
+      `;
     } else {
       timelineContent.innerHTML = '<div>No timeline events available.</div>';
     }
