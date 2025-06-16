@@ -5,3 +5,16 @@ Meet ClinAI - your intelligent clinical assistant that revolutionizes patient re
 
 ## Video
 [![Demo Video Thumbnail](assets/ClinAI_thumbnail.png)](https://youtu.be/0tUWbR_9Olc)
+
+## Tech used
+
+Gemini API - [Link](https://ai.google.dev/)
+MCP - [Link](https://modelcontextprotocol.io/introduction)
+Vanilla Js
+FastAPI - [Link](https://fastapi.tiangolo.com/)
+
+# Features
+
+1) Intelligent patient record documentation using just doctor patient conversation.
+2) Patient lookup and event timelines using reactive dashboards and Agentic tools.
+3) Semantic search for reverse lookups and easy patient information access using historical context (LLM based retrieval and ranking)
