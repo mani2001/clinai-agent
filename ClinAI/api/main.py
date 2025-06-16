@@ -308,26 +308,26 @@ async def get_patient_data(patient_id: str):
         print(f"[MONGODB ERROR] Failed to fetch patient data: {e}")
         return JSONResponse(content={"error": f"Failed to fetch patient data: {str(e)}"}, status_code=500)
 
-@app.patch("/patient/{patient_id}/keywords")
-async def update_patient_keywords(patient_id: str, request: Request):
+@app.patch("/patient/{patient_id}/prescriptions")
+async def update_patient_prescriptions(patient_id: str, request: Request):
     try:
         data = await request.json()
-        keywords = data.get("keywords", "")
-        if not isinstance(keywords, str):
-            raise HTTPException(status_code=400, detail="Keywords must be a string")
+        prescriptions = data.get("prescriptions", "")
+        if not isinstance(prescriptions, str):
+            raise HTTPException(status_code=400, detail="Prescriptions must be a string")
 
         result = await app.state.db[settings.mongodb_collection].update_one(
             {"patient_id": str(patient_id)},
-            {"$set": {"keywords": keywords}}
+            {"$set": {"prescriptions": prescriptions}}
         )
 
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Patient not found")
 
-        print(f"[MONGODB] Updated keywords for patient_id: {patient_id}")
-        return JSONResponse(content={"message": f"Keywords updated successfully for patient {patient_id}"}, status_code=200)
+        print(f"[MONGODB] Updated prescriptions for patient_id: {patient_id}")
+        return JSONResponse(content={"message": f"Prescriptions updated successfully for patient {patient_id}"}, status_code=200)
     except HTTPException as he:
         raise he
     except Exception as e:
-        print(f"[MONGODB ERROR] Failed to update keywords: {e}")
-        return JSONResponse(content={"error": f"Failed to update keywords: {str(e)}"}, status_code=500)
+        print(f"[MONGODB ERROR] Failed to update prescriptions: {e}")
+        return JSONResponse(content={"error": f"Failed to update prescriptions: {str(e)}"}, status_code=500)
