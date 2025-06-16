@@ -17,8 +17,69 @@ async function fetchPatientData() {
     document.getElementById('patientAge').textContent = data.age || 'N/A';
     document.getElementById('patientGender').textContent = data.gender || 'N/A';
 
-    // Summary
-    document.getElementById('summaryContent').textContent = data.summary || 'No summary available.';
+    // Summary - make it editable
+    const summaryContainer = document.getElementById('summaryContent').parentElement;
+    summaryContainer.innerHTML = `
+      <div class="summary-header d-flex justify-content-between align-items-center mb-3">
+        <h6 class="mb-0">Summary</h6>
+        <button class="btn btn-sm btn-outline-primary" id="editSummaryBtn">
+          <i class="bi bi-pencil"></i> Edit
+        </button>
+      </div>
+      <div id="summaryDisplay" class="summary-display">
+        ${data.summary || 'No summary available.'}
+      </div>
+      <div id="summaryEdit" class="summary-edit" style="display: none;">
+        <textarea class="form-control mb-2" id="summaryTextarea" rows="6">${data.summary || ''}</textarea>
+        <div class="summary-actions">
+          <button class="btn btn-sm btn-success" id="saveSummaryBtn">
+            <i class="bi bi-save"></i> Save
+          </button>
+          <button class="btn btn-sm btn-secondary" id="cancelSummaryBtn">
+            <i class="bi bi-x-circle"></i> Cancel
+          </button>
+        </div>
+      </div>
+    `;
+
+    // Summary editing functionality
+    document.getElementById('editSummaryBtn').addEventListener('click', () => {
+      document.getElementById('summaryDisplay').style.display = 'none';
+      document.getElementById('summaryEdit').style.display = 'block';
+      document.getElementById('editSummaryBtn').style.display = 'none';
+      document.getElementById('summaryTextarea').focus();
+    });
+
+    document.getElementById('cancelSummaryBtn').addEventListener('click', () => {
+      document.getElementById('summaryDisplay').style.display = 'block';
+      document.getElementById('summaryEdit').style.display = 'none';
+      document.getElementById('editSummaryBtn').style.display = 'block';
+      document.getElementById('summaryTextarea').value = data.summary || '';
+    });
+
+    document.getElementById('saveSummaryBtn').addEventListener('click', async () => {
+      const newSummary = document.getElementById('summaryTextarea').value;
+      try {
+        const response = await fetch(`/patient/${patientId}/summary`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ summary: newSummary })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+          document.getElementById('summaryDisplay').textContent = newSummary;
+          document.getElementById('summaryDisplay').style.display = 'block';
+          document.getElementById('summaryEdit').style.display = 'none';
+          document.getElementById('editSummaryBtn').style.display = 'block';
+          alert('Summary saved successfully!');
+        } else {
+          alert(result.error || 'Failed to save summary.');
+        }
+      } catch (error) {
+        alert('Error saving summary: ' + error.message);
+      }
+    });
 
     // Prescriptions - make it editable with add/delete functionality
     const prescriptionsTable = document.getElementById('prescriptionsTable');
