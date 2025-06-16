@@ -308,6 +308,30 @@ async def get_patient_data(patient_id: str):
         print(f"[MONGODB ERROR] Failed to fetch patient data: {e}")
         return JSONResponse(content={"error": f"Failed to fetch patient data: {str(e)}"}, status_code=500)
 
+@app.patch("/patient/{patient_id}/timeline")
+async def update_patient_timeline(patient_id: str, request: Request):
+    try:
+        data = await request.json()
+        timeline = data.get("timeline", "")
+        if not isinstance(timeline, str):
+            raise HTTPException(status_code=400, detail="Timeline must be a string")
+
+        result = await app.state.db[settings.mongodb_collection].update_one(
+            {"patient_id": str(patient_id)},
+            {"$set": {"timeline": timeline}}
+        )
+
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail="Patient not found")
+
+        print(f"[MONGODB] Updated timeline for patient_id: {patient_id}")
+        return JSONResponse(content={"message": f"Timeline updated successfully for patient {patient_id}"}, status_code=200)
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"[MONGODB ERROR] Failed to update timeline: {e}")
+        return JSONResponse(content={"error": f"Failed to update timeline: {str(e)}"}, status_code=500)
+
 @app.patch("/patient/{patient_id}/prescriptions")
 async def update_patient_prescriptions(patient_id: str, request: Request):
     try:

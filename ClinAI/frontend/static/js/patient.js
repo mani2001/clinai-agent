@@ -194,7 +194,7 @@ async function fetchPatientData() {
     // Initial render
     renderPrescriptions();
 
-    // Timeline - parse the list string and create horizontal scrollable cards
+    // Timeline - parse the list string and create horizontal scrollable cards with full editing
     const timelineContent = document.getElementById('timelineContent');
     timelineContent.innerHTML = '';
     
@@ -209,30 +209,92 @@ async function fetchPatientData() {
       }
     }
 
-    if (timelineEvents.length > 0) {
+    // Timeline editing state
+    let editingIndex = -1;
+
+    function renderTimeline() {
+      if (timelineEvents.length === 0) {
+        timelineContent.innerHTML = `
+          <div class="timeline-empty">
+            <div>No timeline events available.</div>
+            <button class="btn btn-primary mt-2" onclick="addTimelineEvent(0)">
+              <i class="bi bi-plus-circle"></i> Add First Event
+            </button>
+          </div>
+        `;
+        return;
+      }
+
       const cardsHtml = timelineEvents.map((event, index) => `
-        <div class="timeline-card-wrapper">
+        <div class="timeline-card-wrapper" data-index="${index}">
           <div class="timeline-card-modern">
             <div class="timeline-card-header">
               <span class="timeline-badge">Event ${index + 1} of ${timelineEvents.length}</span>
+              <div class="timeline-actions">
+                <button class="btn-icon" onclick="editTimelineEvent(${index})" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn-icon" onclick="deleteTimelineEvent(${index})" title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
             </div>
-            <div class="timeline-card-content">
-              ${event}
+            <div class="timeline-card-content" id="content-${index}">
+              ${editingIndex === index ? `
+                <textarea class="timeline-edit-textarea" id="edit-${index}">${event}</textarea>
+                <div class="timeline-edit-actions">
+                  <button class="btn btn-sm btn-success" onclick="saveTimelineEdit(${index})">Save</button>
+                  <button class="btn btn-sm btn-secondary" onclick="cancelTimelineEdit()">Cancel</button>
+                </div>
+              ` : event}
             </div>
           </div>
         </div>
+        ${index < timelineEvents.length - 1 ? `
+          <div class="timeline-add-between">
+            <button class="btn-add-between" onclick="addTimelineEvent(${index + 1})" title="Add Event">
+              <i class="bi bi-plus"></i>
+            </button>
+          </div>
+        ` : ''}
       `).join('');
       
       timelineContent.innerHTML = `
+        <div class="timeline-controls-header">
+          <button class="btn btn-primary btn-sm" onclick="saveAllTimelineChanges()">
+            <i class="bi bi-save"></i> Save Timeline
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="cancelAllTimelineChanges()">
+            <i class="bi bi-x-circle"></i> Cancel Changes
+          </button>
+        </div>
         <div class="timeline-scroll-container">
+          <div class="timeline-add-start">
+            <button class="btn-add-start" onclick="addTimelineEvent(0)" title="Add First Event">
+              <i class="bi bi-plus"></i>
+            </button>
+          </div>
           ${cardsHtml}
+          <div class="timeline-add-end">
+            <button class="btn-add-end" onclick="addTimelineEvent(${timelineEvents.length})" title="Add Event at End">
+              <i class="bi bi-plus"></i>
+            </button>
+          </div>
         </div>
         <style>
+          .timeline-controls-header {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 1rem;
+            justify-content: flex-end;
+          }
+          
           .timeline-scroll-container {
             display: flex;
             overflow-x: auto;
             overflow-y: hidden;
-            gap: 1rem;
+            align-items: center;
+            gap: 0;
             padding: 1rem 0;
             scroll-behavior: smooth;
           }
@@ -264,9 +326,10 @@ async function fetchPatientData() {
             box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
             overflow: hidden;
             transition: transform 0.3s ease, box-shadow 0.3s ease;
-            height: 200px;
+            height: 250px;
             display: flex;
             flex-direction: column;
+            margin: 0 10px;
           }
           
           .timeline-card-modern:hover {
@@ -278,6 +341,9 @@ async function fetchPatientData() {
             background: rgba(255, 255, 255, 0.2);
             padding: 12px 16px;
             backdrop-filter: blur(10px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
           }
           
           .timeline-badge {
@@ -291,6 +357,25 @@ async function fetchPatientData() {
             letter-spacing: 0.5px;
           }
           
+          .timeline-actions {
+            display: flex;
+            gap: 5px;
+          }
+          
+          .btn-icon {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 5px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+          }
+          
+          .btn-icon:hover {
+            background: rgba(255, 255, 255, 0.3);
+          }
+          
           .timeline-card-content {
             padding: 16px;
             color: white;
@@ -298,14 +383,152 @@ async function fetchPatientData() {
             line-height: 1.5;
             flex: 1;
             display: flex;
-            align-items: center;
+            flex-direction: column;
+            justify-content: center;
             text-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+          }
+          
+          .timeline-edit-textarea {
+            width: 100%;
+            min-height: 80px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            border: none;
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 0.9rem;
+            resize: vertical;
+          }
+          
+          .timeline-edit-actions {
+            display: flex;
+            gap: 5px;
+            margin-top: 10px;
+          }
+          
+          .timeline-add-between {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 10px;
+          }
+          
+          .timeline-add-start,
+          .timeline-add-end {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 15px;
+          }
+          
+          .btn-add-between,
+          .btn-add-start,
+          .btn-add-end {
+            background: rgba(78, 115, 223, 0.1);
+            border: 2px dashed #4e73df;
+            color: #4e73df;
+            padding: 15px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: all 0.3s ease;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+          
+          .btn-add-between:hover,
+          .btn-add-start:hover,
+          .btn-add-end:hover {
+            background: #4e73df;
+            color: white;
+            transform: scale(1.1);
+            box-shadow: 0 4px 15px rgba(78, 115, 223, 0.3);
+          }
+          
+          .timeline-empty {
+            text-align: center;
+            padding: 2rem;
+            color: #6c757d;
           }
         </style>
       `;
-    } else {
-      timelineContent.innerHTML = '<div>No timeline events available.</div>';
     }
+
+    // Global timeline management functions
+    window.editTimelineEvent = function(index) {
+      editingIndex = index;
+      renderTimeline();
+      // Focus on textarea
+      setTimeout(() => {
+        const textarea = document.getElementById(`edit-${index}`);
+        if (textarea) {
+          textarea.focus();
+          textarea.select();
+        }
+      }, 100);
+    };
+
+    window.saveTimelineEdit = function(index) {
+      const textarea = document.getElementById(`edit-${index}`);
+      if (textarea && textarea.value.trim()) {
+        timelineEvents[index] = textarea.value.trim();
+        editingIndex = -1;
+        renderTimeline();
+      }
+    };
+
+    window.cancelTimelineEdit = function() {
+      editingIndex = -1;
+      renderTimeline();
+    };
+
+    window.deleteTimelineEvent = function(index) {
+      if (confirm('Are you sure you want to delete this timeline event?')) {
+        timelineEvents.splice(index, 1);
+        editingIndex = -1;
+        renderTimeline();
+      }
+    };
+
+    window.addTimelineEvent = function(index) {
+      const newEvent = prompt('Enter new timeline event:');
+      if (newEvent && newEvent.trim()) {
+        timelineEvents.splice(index, 0, newEvent.trim());
+        renderTimeline();
+      }
+    };
+
+    window.saveAllTimelineChanges = async function() {
+      try {
+        const timelineString = JSON.stringify(timelineEvents);
+        const response = await fetch(`/patient/${patientId}/timeline`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ timeline: timelineString })
+        });
+
+        const result = await response.json();
+        if (response.ok) {
+          alert('Timeline saved successfully!');
+        } else {
+          alert(result.error || 'Failed to save timeline.');
+        }
+      } catch (error) {
+        alert('Error saving timeline: ' + error.message);
+      }
+    };
+
+    window.cancelAllTimelineChanges = function() {
+      if (confirm('Are you sure you want to cancel all changes? This will reload the page.')) {
+        location.reload();
+      }
+    };
+
+    // Initial render
+    renderTimeline();
 
     // Keywords - handle as string since it's stored as comma-separated
     const keywordsInput = document.getElementById('keywordsInput');
