@@ -8,10 +8,10 @@ Meet ClinAI - your intelligent clinical assistant that revolutionizes patient re
 
 ## Tech used
 
-Gemini API - [Link](https://ai.google.dev/)
-MCP - [Link](https://modelcontextprotocol.io/introduction)
-Vanilla Js
-FastAPI - [Link](https://fastapi.tiangolo.com/)
+Gemini API - [Link](https://ai.google.dev/)<br>
+MCP - [Link](https://modelcontextprotocol.io/introduction)<br>
+Vanilla Js<br>
+FastAPI - [Link](https://fastapi.tiangolo.com/)<br>
 
 # Features
 
